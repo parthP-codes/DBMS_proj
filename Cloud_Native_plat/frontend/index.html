@@ -149,6 +149,15 @@
       </button>
     </div>
 
+    <!-- Product Search -->
+    <div class="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
+      <div class="relative flex-1 max-w-xl">
+        <i data-lucide="search" class="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+        <input type="search" id="product-search" oninput="renderProducts()" autocomplete="off" aria-label="Search products" placeholder="Search products by name, category or ID..." class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 transition" />
+      </div>
+      <span id="search-count" aria-live="polite" class="text-xs font-mono text-slate-400"></span>
+    </div>
+
     <!-- Product Grid -->
     <div id="product-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
       <!-- Loading Skeleton -->
@@ -420,6 +429,36 @@
       "prod-103": "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=600&auto=format&fit=crop&q=80"
     };
 
+    // Products without a photo above show their category's icon instead
+    const categoryIcons = {
+      "Electronics": "cpu",
+      "Displays": "monitor",
+      "Computers & Accessories": "laptop",
+      "Mobile & Wearables": "smartphone",
+      "Gaming": "gamepad-2",
+      "Cameras & Photography": "camera",
+      "Home & Kitchen": "utensils",
+      "Furniture": "armchair",
+      "Home Decor & Lighting": "lamp",
+      "Men's Fashion": "shirt",
+      "Women's Fashion": "gem",
+      "Footwear": "footprints",
+      "Bags & Luggage": "backpack",
+      "Sports & Outdoors": "tent",
+      "Fitness Equipment": "dumbbell",
+      "Beauty & Personal Care": "sparkles",
+      "Health & Wellness": "heart-pulse",
+      "Toys & Games": "puzzle",
+      "Baby & Kids": "baby",
+      "Books": "book-open",
+      "Grocery & Gourmet": "shopping-basket",
+      "Pet Supplies": "paw-print",
+      "Automotive": "car",
+      "Office & Stationery": "pencil",
+      "Garden & Tools": "shovel",
+      "Music & Instruments": "music"
+    };
+
     function logTelemetry(msg) {
       document.getElementById('live-log').innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
     }
@@ -600,6 +639,8 @@
           <p class="text-slate-400 text-sm">Querying Amazon DynamoDB in us-east-1...</p>
         </div>
       `;
+      products = [];
+      document.getElementById('search-count').innerText = '';
       logTelemetry('Fetching products from Amazon DynamoDB table omnicart-prod-products...');
 
       try {
@@ -616,39 +657,7 @@
           return;
         }
 
-        grid.innerHTML = products.map(prod => `
-          <div class="bg-slate-800/40 border border-slate-700/60 rounded-2xl overflow-hidden hover:border-amber-500/50 transition-all duration-300 flex flex-col group shadow-lg">
-            <div class="h-48 overflow-hidden relative bg-slate-950">
-              <img src="${productImages[prod.ProductId] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600'}" alt="${prod.Name}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-              <span class="absolute top-3 left-3 bg-slate-900/90 backdrop-blur border border-slate-700 text-amber-400 text-[10px] font-mono font-bold px-2.5 py-1 rounded-md uppercase">
-                ${prod.Category}
-              </span>
-              <span class="absolute top-3 right-3 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-mono font-bold px-2 py-0.5 rounded">
-                ${prod.Stock} IN STOCK
-              </span>
-            </div>
-            
-            <div class="p-5 flex-1 flex flex-col justify-between">
-              <div>
-                <span class="text-[11px] font-mono text-slate-400 block">${prod.ProductId}</span>
-                <h3 class="text-base font-bold text-white group-hover:text-amber-400 transition-colors mt-0.5">${prod.Name}</h3>
-              </div>
-              
-              <div class="mt-5 pt-4 border-t border-slate-700/50 flex items-center justify-between">
-                <div>
-                  <span class="text-xs text-slate-400 block">Unit Price</span>
-                  <span class="text-xl font-bold font-mono text-white">$${parseFloat(prod.Price).toFixed(2)}</span>
-                </div>
-                <button onclick="addToCart('${prod.ProductId}')" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-3.5 py-2 rounded-xl text-xs flex items-center space-x-1.5 transition">
-                  <i data-lucide="plus" class="w-4 h-4"></i>
-                  <span>Add to Cart</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        `).join('');
-
-        lucide.createIcons();
+        renderProducts();
         logTelemetry(`Loaded ${products.length} products successfully from DynamoDB.`);
       } catch (err) {
         console.error(err);
@@ -659,6 +668,85 @@
         `;
         logTelemetry(`Error loading products: ${err.message}`);
       }
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+    }
+
+    // Lower-cases and drops apostrophes/hyphens, so "mens" finds Men's and "noise canceling" finds Noise-Canceling
+    function normalizeSearchText(value) {
+      return String(value).toLowerCase().replace(/['’]/g, '').replace(/-/g, ' ');
+    }
+
+    // Shows the products whose name, category or ID start a word with every search word (all products when empty)
+    function renderProducts() {
+      if (products.length === 0) return;
+
+      const grid = document.getElementById('product-grid');
+      const query = document.getElementById('product-search').value.trim();
+      const terms = normalizeSearchText(query).split(' ').filter(Boolean);
+      const visible = products.filter(prod => {
+        const text = ' ' + normalizeSearchText(`${prod.Name} ${prod.Category} ${prod.ProductId}`);
+        return terms.every(term => text.includes(' ' + term));
+      });
+
+      document.getElementById('search-count').innerText = query
+        ? `${visible.length} of ${products.length} products`
+        : `${products.length} products`;
+
+      if (visible.length === 0) {
+        grid.innerHTML = `
+          <div class="col-span-full py-12 text-center text-slate-400 text-sm">
+            <p>No products match <strong class="text-slate-200">"${escapeHtml(query)}"</strong>. Try a different name, category or product ID.</p>
+            <button onclick="clearSearch()" class="mt-4 text-xs text-amber-400 hover:text-amber-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-2 rounded-lg transition font-mono">Clear search</button>
+          </div>
+        `;
+        return;
+      }
+
+      grid.innerHTML = visible.map(prod => `
+        <div class="bg-slate-800/40 border border-slate-700/60 rounded-2xl overflow-hidden hover:border-amber-500/50 transition-all duration-300 flex flex-col group shadow-lg">
+          <div class="h-48 overflow-hidden relative bg-slate-950">
+            ${productImages[prod.ProductId]
+              ? `<img src="${productImages[prod.ProductId]}" alt="${escapeHtml(prod.Name)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />`
+              : `<div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900"><i data-lucide="${categoryIcons[prod.Category] || 'package'}" class="w-16 h-16 text-amber-500/60"></i></div>`}
+            <span class="absolute top-3 left-3 bg-slate-900/90 backdrop-blur border border-slate-700 text-amber-400 text-[10px] font-mono font-bold px-2.5 py-1 rounded-md uppercase">
+              ${escapeHtml(prod.Category)}
+            </span>
+            <span class="absolute top-3 right-3 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-mono font-bold px-2 py-0.5 rounded">
+              ${prod.Stock} IN STOCK
+            </span>
+          </div>
+
+          <div class="p-5 flex-1 flex flex-col justify-between">
+            <div>
+              <span class="text-[11px] font-mono text-slate-400 block">${escapeHtml(prod.ProductId)}</span>
+              <h3 class="text-base font-bold text-white group-hover:text-amber-400 transition-colors mt-0.5">${escapeHtml(prod.Name)}</h3>
+            </div>
+
+            <div class="mt-5 pt-4 border-t border-slate-700/50 flex items-center justify-between">
+              <div>
+                <span class="text-xs text-slate-400 block">Unit Price</span>
+                <span class="text-xl font-bold font-mono text-white">$${parseFloat(prod.Price).toFixed(2)}</span>
+              </div>
+              <button onclick="addToCart('${prod.ProductId}')" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-3.5 py-2 rounded-xl text-xs flex items-center space-x-1.5 transition">
+                <i data-lucide="plus" class="w-4 h-4"></i>
+                <span>Add to Cart</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+
+      lucide.createIcons();
+    }
+
+    function clearSearch() {
+      const input = document.getElementById('product-search');
+      input.value = '';
+      renderProducts();
+      input.focus();
     }
 
     function addToCart(productId) {
