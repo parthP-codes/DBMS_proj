@@ -16,11 +16,25 @@ PORT = 8000
 USER_POOL_ID = "us-east-1_HNnLI9NzL"
 CLIENT_ID = "5lv31ch5jipcofi363s2l16cg9"
 
+# Mirrors CognitoUserPool.PasswordPolicy in infrastructure/cloudformation/omnicart_platform.yaml
+# (no symbol required). Checked up front so a bad password is rejected before anything is created in Cognito.
+MIN_PASSWORD_LENGTH = 8
+
 # Helper to serialize Decimal types from DynamoDB to JSON
 def decimal_default(obj):
     if isinstance(obj, Decimal):
         return float(obj)
     raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+
+# Helper returning what a password is missing, as phrases for "Password must ..." (empty list = OK)
+def password_policy_violations(password):
+    checks = [
+        (len(password) >= MIN_PASSWORD_LENGTH, f"be at least {MIN_PASSWORD_LENGTH} characters long"),
+        (any(c.isupper() for c in password), "contain an uppercase letter"),
+        (any(c.islower() for c in password), "contain a lowercase letter"),
+        (any(c.isdigit() for c in password), "contain a number"),
+    ]
+    return [requirement for passed, requirement in checks if not passed]
 
 class OmniCartRequestHandler(SimpleHTTPRequestHandler):
     
@@ -95,6 +109,14 @@ class OmniCartRequestHandler(SimpleHTTPRequestHandler):
                 self.wfile.write(json.dumps({"error": "Email and password are required."}).encode('utf-8'))
                 return
 
+            violations = password_policy_violations(password)
+            if violations:
+                self.send_response(400)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": "Password must " + ", ".join(violations) + "."}).encode('utf-8'))
+                return
+
             try:
                 client = boto3.client('cognito-idp', region_name=REGION)
                 
@@ -111,12 +133,21 @@ class OmniCartRequestHandler(SimpleHTTPRequestHandler):
                 )
 
                 # Set permanent password
-                client.admin_set_user_password(
-                    UserPoolId=USER_POOL_ID,
-                    Username=email,
-                    Password=password,
-                    Permanent=True
-                )
+                try:
+                    client.admin_set_user_password(
+                        UserPoolId=USER_POOL_ID,
+                        Username=email,
+                        Password=password,
+                        Permanent=True
+                    )
+                except Exception:
+                    # Don't leave a half-created user (stuck in FORCE_CHANGE_PASSWORD) in the pool,
+                    # e.g. when the live pool policy is stricter than the check above.
+                    try:
+                        client.admin_delete_user(UserPoolId=USER_POOL_ID, Username=res['User']['Username'])
+                    except Exception as cleanup_error:
+                        print(f"[WARN] Could not remove half-created Cognito user {email}: {cleanup_error}", file=sys.stderr)
+                    raise
 
                 response_data = {
                     "status": "SUCCESS",
@@ -136,6 +167,11 @@ class OmniCartRequestHandler(SimpleHTTPRequestHandler):
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
                 self.wfile.write(json.dumps({"error": "An account with this email already exists in Cognito."}).encode('utf-8'))
+            except client.exceptions.InvalidPasswordException as e:
+                self.send_response(400)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": e.response['Error']['Message']}).encode('utf-8'))
             except Exception as e:
                 self.send_response(500)
                 self.send_header('Content-Type', 'application/json')
