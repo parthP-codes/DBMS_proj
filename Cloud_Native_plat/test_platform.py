@@ -19,6 +19,7 @@ import time
 from decimal import Decimal
 
 REGION = "us-east-1"
+PRODUCTS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "products.json")
 
 def print_step(title):
     print("\n" + "="*60)
@@ -53,36 +54,16 @@ def populate_dynamodb_products():
         return False
 
     table = dynamodb.Table(table_name)
-    sample_products = [
-        {
-            "ProductId": "prod-101",
-            "Category": "Electronics",
-            "Name": "Wireless Noise-Canceling Headphones",
-            "Price": Decimal("199.99"),
-            "Stock": 50,
-            "Status": "IN_STOCK"
-        },
-        {
-            "ProductId": "prod-102",
-            "Category": "Electronics",
-            "Name": "Mechanical Ergonomic Keyboard",
-            "Price": Decimal("129.50"),
-            "Stock": 35,
-            "Status": "IN_STOCK"
-        },
-        {
-            "ProductId": "prod-103",
-            "Category": "Displays",
-            "Name": "4K Ultra-HD Smart Monitor 32-inch",
-            "Price": Decimal("349.00"),
-            "Stock": 15,
-            "Status": "LOW_STOCK"
-        }
-    ]
+    # DynamoDB needs Decimal (not float) for numbers, so JSON floats are parsed as Decimal
+    with open(PRODUCTS_FILE, encoding="utf-8") as f:
+        sample_products = json.load(f, parse_float=Decimal)
 
-    for item in sample_products:
-        table.put_item(Item=item)
-        print(f"   [+] Seeded Product: {item['ProductId']} - {item['Name']} (${item['Price']})")
+    with table.batch_writer() as batch:
+        for item in sample_products:
+            batch.put_item(Item=item)
+
+    categories = {item["Category"] for item in sample_products}
+    print(f"   [+] Seeded {len(sample_products)} products across {len(categories)} categories (data/products.json)")
     print("[OK] DynamoDB products successfully populated! Ready to view in AWS Console.")
     return True
 
