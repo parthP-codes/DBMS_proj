@@ -42,6 +42,14 @@ def test_password_breaking_the_policy_is_rejected_and_no_user_is_created(
     assert pool_users(cognito, user_pool) == []
 
 
+@pytest.mark.parametrize("password", [12345678, True, ["Password123"], {"password": "Password123"}])
+def test_a_password_that_is_not_text_is_a_400_not_a_crash(api, cognito, user_pool, password):
+    status, body = register(api, password)
+
+    assert status == 400 and body["error"]
+    assert pool_users(cognito, user_pool) == []
+
+
 def test_every_broken_rule_is_reported_at_once(api, user_pool):
     status, body = register(api, "abc")
 

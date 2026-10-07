@@ -23,28 +23,6 @@ def products():
     return json.loads(PRODUCTS_FILE.read_text(encoding="utf-8"), parse_float=Decimal)
 
 
-@pytest.fixture
-def products_table(aws):
-    """The products table exactly as defined in the CloudFormation template."""
-    boto3.client("dynamodb", region_name=server.REGION).create_table(
-        TableName="omnicart-prod-products",
-        BillingMode="PAY_PER_REQUEST",
-        AttributeDefinitions=[
-            {"AttributeName": "ProductId", "AttributeType": "S"},
-            {"AttributeName": "Category", "AttributeType": "S"},
-        ],
-        KeySchema=[{"AttributeName": "ProductId", "KeyType": "HASH"}],
-        GlobalSecondaryIndexes=[
-            {
-                "IndexName": "CategoryIndex",
-                "KeySchema": [{"AttributeName": "Category", "KeyType": "HASH"}],
-                "Projection": {"ProjectionType": "ALL"},
-            }
-        ],
-    )
-    return boto3.resource("dynamodb", region_name=server.REGION).Table("omnicart-prod-products")
-
-
 # --- seed data -------------------------------------------------------------------------------------
 
 def test_catalogue_has_at_least_100_products(products):
@@ -102,8 +80,7 @@ def test_seeding_writes_every_product_to_dynamodb(products, products_table):
     assert test_platform.populate_dynamodb_products() is True
 
     stored = products_table.scan()["Items"]
-    assert sorted(p["ProductId"] for p in stored) == sorted(p["ProductId"] for p in products)
-    assert {p["ProductId"]: p["Price"] for p in stored} == {p["ProductId"]: p["Price"] for p in products}
+    assert {p["ProductId"]: p for p in stored} == {p["ProductId"]: p for p in products}  # every attribute, not just ids
 
 
 def test_seeded_products_can_be_queried_by_category(products, products_table):

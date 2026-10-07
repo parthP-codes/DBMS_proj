@@ -198,6 +198,7 @@
           <i data-lucide="info" class="w-3.5 h-3.5 text-amber-400"></i>
           <span id="cart-user-text">Checking out as: <strong>Guest Shopper</strong></span>
         </div>
+        <div id="cart-save-status" class="text-[11px] text-slate-500 font-mono leading-relaxed"></div>
         <button id="checkout-btn" onclick="executeCheckout()" class="w-full bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-bold py-3 px-4 rounded-xl shadow-lg shadow-orange-500/20 transition flex items-center justify-center space-x-2">
           <i data-lucide="send" class="w-4 h-4"></i>
           <span>Place Order & Dispatch to SQS</span>
@@ -423,6 +424,15 @@
     let currentUser = null;
     let currentTokens = null;
 
+    // Saved cart (signed-in users): one item per user in the DynamoDB table omnicart-prod-carts
+    const MAX_CART_QUANTITY = 99;       // same limit as the server
+    const GUEST_CART_NOTE = 'Guest cart: kept in this page only. Sign in to save it to DynamoDB.';
+    let cartReady = false;              // the saved cart has been loaded, so it is safe to save over it
+    let cartDirty = false;              // changes waiting to be saved
+    let cartSaveRunning = false;
+    let cartSavePromise = Promise.resolve();
+    let checkingOut = false;            // the cart is frozen while an order is being placed
+
     const productImages = {
       "prod-101": "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&auto=format&fit=crop&q=80",
       "prod-102": "https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=600&auto=format&fit=crop&q=80",
@@ -558,6 +568,7 @@
         updateAuthUI();
         closeAuthModal();
         logTelemetry(`Authenticated as [${email}]. Signed JWT tokens received from Cognito.`);
+        loadSavedCart();
       } catch (err) {
         alert("Authentication Error: " + err.message);
         logTelemetry(`Cognito Auth Error: ${err.message}`);
@@ -586,6 +597,7 @@
           </div>
         `;
         cartNotice.innerHTML = `Checking out as: <strong class="text-purple-300 font-mono">${currentUser}</strong> (Cognito Verified)`;
+        setCartStatus('Syncing your cart with DynamoDB...');
       } else {
         container.innerHTML = `
           <button id="auth-btn" onclick="openAuthModal()" class="inline-flex items-center space-x-1.5 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/50 text-purple-300 text-xs font-medium px-3 py-2 rounded-lg transition">
@@ -594,6 +606,7 @@
           </button>
         `;
         cartNotice.innerHTML = `Checking out as: <strong>Guest Shopper</strong>`;
+        setCartStatus(GUEST_CART_NOTE);
       }
       lucide.createIcons();
     }
@@ -601,6 +614,10 @@
     function handleLogout() {
       currentUser = null;
       currentTokens = null;
+      cart = [];  // the saved cart stays in DynamoDB for the next sign-in
+      cartReady = false;
+      cartDirty = false;
+      updateCartUI();
       updateAuthUI();
       logTelemetry('Signed out. Reverted to Guest session.');
     }
@@ -674,9 +691,10 @@
       return String(value).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
     }
 
-    // Lower-cases and drops apostrophes/hyphens, so "mens" finds Men's and "noise canceling" finds Noise-Canceling
+    // Lower-cases, drops apostrophes and turns every other character that is not a letter, digit or dot into a space,
+    // so "mens" finds Men's, "noise canceling" finds Noise-Canceling and "mystery" finds "(Mystery Novel)"
     function normalizeSearchText(value) {
-      return String(value).toLowerCase().replace(/['’]/g, '').replace(/-/g, ' ');
+      return String(value).toLowerCase().replace(/['’]/g, '').replace(/[^\p{L}\p{N}.]+/gu, ' ');
     }
 
     // Shows the products whose name, category or ID start a word with every search word (all products when empty)
@@ -749,24 +767,113 @@
       input.focus();
     }
 
+    // --- Saved cart (signed-in users) ---
+    function authHeaders() {
+      return currentTokens ? { 'Authorization': `Bearer ${currentTokens.access_token}` } : {};
+    }
+
+    function setCartStatus(html) {
+      document.getElementById('cart-save-status').innerHTML = html;
+    }
+
+    // Where the signed-in user's cart lives, with a link to find it in the AWS console
+    function savedCartHtml(dynamodb) {
+      const consoleUrl = `https://us-east-1.console.aws.amazon.com/dynamodbv2/home?region=us-east-1#item-explorer?table=${encodeURIComponent(dynamodb.table)}`;
+      return `Saved in DynamoDB table <strong class="text-slate-300">${escapeHtml(dynamodb.table)}</strong> &middot; ` +
+        `<a href="${consoleUrl}" target="_blank" rel="noopener" class="text-amber-400 hover:underline">open in AWS Console</a><br>` +
+        `<span class="break-all text-slate-600">PK ${escapeHtml(dynamodb.PK)} &middot; SK ${escapeHtml(dynamodb.SK)}</span>`;
+    }
+
+    // Sign-in tokens last an hour; after that the server answers 401 and the user has to sign in again
+    function handleSessionExpired() {
+      alert('Your session has expired. Please sign in again - your saved cart will be waiting.');
+      handleLogout();
+      openAuthModal();
+    }
+
+    // After signing in: fetch the saved cart from DynamoDB and merge in anything added as a guest
+    async function loadSavedCart() {
+      const token = currentTokens;
+      try {
+        const res = await fetch('/api/cart', { headers: authHeaders() });
+        const data = await res.json();
+        if (currentTokens !== token) return;  // signed out while waiting
+        if (res.status === 401) return handleSessionExpired();
+        if (!res.ok) throw new Error(data.error || 'Could not load the saved cart');
+
+        const merged = new Map(data.items.map(i => [i.product_id, { ProductId: i.product_id, Name: i.name, Price: i.price, quantity: i.quantity }]));
+        for (const item of cart) {
+          const saved = merged.get(item.ProductId);
+          merged.set(item.ProductId, { ...item, quantity: Math.min(MAX_CART_QUANTITY, item.quantity + (saved ? saved.quantity : 0)) });
+        }
+        const addedAsGuest = cart.length > 0;
+        cart = [...merged.values()];
+        cartReady = true;
+        updateCartUI();
+        setCartStatus(savedCartHtml(data.dynamodb));
+        logTelemetry(`Loaded saved cart from DynamoDB (${data.dynamodb.table}): ${data.item_count} item(s) for ${currentUser}.`);
+        if (addedAsGuest) saveCart();  // store the merged cart
+      } catch (err) {
+        setCartStatus(`<span class="text-red-400">Could not load your saved cart: ${escapeHtml(err.message)}</span>`);
+        logTelemetry(`Could not load saved cart: ${err.message}. This session's changes will not be saved.`);
+      }
+    }
+
+    // Saves the cart to DynamoDB (signed-in users only). Quick successive changes are combined and sent one at a time, in order.
+    function saveCart() {
+      if (!currentTokens || !cartReady || checkingOut) return cartSavePromise;
+      cartDirty = true;
+      if (!cartSaveRunning) cartSavePromise = flushCartSaves();
+      return cartSavePromise;
+    }
+
+    async function flushCartSaves() {
+      cartSaveRunning = true;
+      const token = currentTokens;
+      try {
+        while (cartDirty) {
+          cartDirty = false;
+          const res = await fetch('/api/cart', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+            body: JSON.stringify({ items: cart.map(item => ({ product_id: item.ProductId, quantity: item.quantity })) })
+          });
+          const data = await res.json();
+          if (currentTokens !== token) return;  // signed out while waiting
+          if (res.status === 401) return handleSessionExpired();
+          if (!res.ok) throw new Error(data.error || 'Cart save failed');
+          setCartStatus(savedCartHtml(data.dynamodb));
+          logTelemetry(`Saved cart to DynamoDB (${data.dynamodb.table}): ${data.item_count} item(s), $${data.subtotal.toFixed(2)}.`);
+        }
+      } catch (err) {
+        setCartStatus(`<span class="text-red-400">Cart not saved: ${escapeHtml(err.message)}</span>`);
+        logTelemetry(`Cart not saved: ${err.message}`);
+      } finally {
+        cartSaveRunning = false;
+      }
+    }
+
     function addToCart(productId) {
       const prod = products.find(p => p.ProductId === productId);
-      if (!prod) return;
+      if (!prod || checkingOut) return;
 
       const existing = cart.find(c => c.ProductId === productId);
       if (existing) {
-        existing.quantity += 1;
+        existing.quantity = Math.min(MAX_CART_QUANTITY, existing.quantity + 1);
       } else {
         cart.push({ ...prod, quantity: 1 });
       }
 
       updateCartUI();
+      saveCart();
       logTelemetry(`Added [${prod.Name}] to cart. Current items: ${cart.reduce((a, b) => a + b.quantity, 0)}`);
     }
 
     function removeFromCart(productId) {
+      if (checkingOut) return;
       cart = cart.filter(c => c.ProductId !== productId);
       updateCartUI();
+      saveCart();
     }
 
     function updateCartUI() {
@@ -789,7 +896,7 @@
       container.innerHTML = cart.map(item => `
         <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
           <div>
-            <h4 class="text-xs font-bold text-white">${item.Name}</h4>
+            <h4 class="text-xs font-bold text-white">${escapeHtml(item.Name)}</h4>
             <div class="text-[11px] text-slate-400 font-mono mt-0.5">
               Qty: ${item.quantity} &times; $${parseFloat(item.Price).toFixed(2)}
             </div>
@@ -816,6 +923,7 @@
 
       const checkoutBtn = document.getElementById('checkout-btn');
       checkoutBtn.disabled = true;
+      checkingOut = true;
       checkoutBtn.innerHTML = `
         <div class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-slate-950 mr-2"></div>
         <span>Dispatching to Amazon SQS...</span>
@@ -824,25 +932,22 @@
       logTelemetry('Sending order payload to /api/orders (Queue: omnicart-prod-order-fulfillment)...');
 
       try {
+        await cartSavePromise;  // a cart save still in flight must not land after the order has emptied the saved cart
+        // The server prices the order from the catalogue and knows who is ordering from the sign-in token
         const payload = {
-          items: cart.map(item => ({
-            product_id: item.ProductId,
-            name: item.Name,
-            quantity: item.quantity,
-            price: parseFloat(item.Price)
-          })),
-          customer_email: currentUser || "guest@omnicart.com",
+          items: cart.map(item => ({ product_id: item.ProductId, quantity: item.quantity })),
           shipping_address: "Campus Department of Computer Science"
         };
 
         const res = await fetch('/api/orders', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
           body: JSON.stringify(payload)
         });
 
-        if (!res.ok) throw new Error('Order creation failed');
         const data = await res.json();
+        if (res.status === 401) return handleSessionExpired();
+        if (!res.ok) throw new Error(data.error || 'Order creation failed');
 
         // Populate and open confirmation modal
         document.getElementById('modal-order-id').innerText = data.order_id;
@@ -856,11 +961,15 @@
         // Clear Cart
         cart = [];
         updateCartUI();
+        if (currentUser) {
+          setCartStatus(data.saved_cart_cleared ? 'Order placed. Your saved cart was emptied in DynamoDB.' : 'Order placed, but your saved cart could not be emptied in DynamoDB.');
+        }
         logTelemetry(`Order placed successfully! SQS Message ID: ${data.sqs_message_id}`);
       } catch (err) {
         alert("Checkout error: " + err.message);
         logTelemetry(`Checkout failed: ${err.message}`);
       } finally {
+        checkingOut = false;
         checkoutBtn.disabled = false;
         checkoutBtn.innerHTML = `
           <i data-lucide="send" class="w-4 h-4"></i>
@@ -899,6 +1008,7 @@
     // Initialize
     document.addEventListener('DOMContentLoaded', () => {
       lucide.createIcons();
+      setCartStatus(GUEST_CART_NOTE);
       loadProducts();
     });
   </script>
