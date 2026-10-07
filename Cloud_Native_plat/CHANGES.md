@@ -148,8 +148,9 @@ You asked to be told, so none of these were fixed. **[verified]** = reproduced o
 15. The cart drawer and the signed-in badge still insert unescaped text into the page [read]; only the code touched
     by the search change was escaped.
 16. The AWS account id, pool id, client id, VPC id and load balancer name are hard-coded in `server.py`, the page
-    (the account id is shown in the banner to every visitor) and the docs [read]. They are now in git history too; if
-    the repository is public, consider moving them to environment variables.
+    (the account id is shown in the banner to every visitor) and the docs [read]. They are not credentials, but this
+    GitHub repository is public, so once this folder is pushed they are visible to everyone and stay in git history.
+    Consider moving them to environment variables and keeping the repository private if that matters to you.
 17. The sign-in form's "pre-fill demo account" button bakes a password (`Password123!`) into the page [read].
 18. The "DynamoDB: Active", "SQS: Ready" and "API Status: Online" badges are fixed text, not real checks [read]; the
     log line says "SRP" while the server receives the plain password and uses admin auth [read].
