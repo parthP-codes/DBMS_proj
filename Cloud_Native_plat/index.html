@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>OmniCart 360 - AWS Cloud-Native Architecture Specification</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Marked.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- Mermaid.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <!-- Highlight.js for syntax highlighting -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <style>
+    @media print {
+      .no-print { display: none !important; }
+      body { background: white !important; color: black !important; }
+      .page-break { page-break-before: always; }
+      pre, table { page-break-inside: avoid; }
+    }
+    .prose pre {
+      background-color: #0f172a;
+      border-radius: 0.5rem;
+      padding: 1rem;
+      overflow-x: auto;
+    }
+    .prose table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.5rem 0;
+    }
+    .prose th, .prose td {
+      border: 1px solid #cbd5e1;
+      padding: 0.65rem 0.85rem;
+      text-align: left;
+    }
+    .prose th {
+      background-color: #f1f5f9;
+      font-weight: 600;
+    }
+    .mermaid {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+      display: flex;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 font-sans antialiased">
+  
+  <!-- Header / Action Bar -->
+  <header class="no-print sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-slate-200 shadow-sm py-3 px-6">
+    <div class="max-w-6xl mx-auto flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <span class="inline-flex items-center justify-center bg-amber-500 text-white font-black text-sm px-2.5 py-1 rounded">AWS</span>
+        <h1 class="text-lg font-bold text-slate-800">OmniCart 360 Architecture Report</h1>
+      </div>
+      <div class="flex items-center space-x-3">
+        <button onclick="window.print()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow transition flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+          Print / Save as PDF
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Document Container -->
+  <main class="max-w-5xl mx-auto px-6 py-10">
+    <article id="content" class="bg-white p-8 md:p-12 rounded-xl shadow-sm border border-slate-200 prose prose-slate max-w-none">
+      <div class="flex justify-center py-12">
+        <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+      </div>
+    </article>
+  </main>
+
+  <script>
+    mermaid.initialize({ startOnLoad: false, theme: 'neutral' });
+
+    async function loadMarkdown() {
+      try {
+        const response = await fetch('./Cloud_Native_Platform_AWS_Design.md');
+        if (!response.ok) throw new Error('Failed to load markdown source.');
+        let markdown = await response.text();
+
+        // Render Markdown to HTML
+        marked.setOptions({
+          highlight: function(code, lang) {
+            if (lang && hljs.getLanguage(lang)) {
+              return hljs.highlight(code, { language: lang }).value;
+            }
+            return hljs.highlightAuto(code).value;
+          }
+        });
+
+        // Convert Mermaid code blocks into <pre class="mermaid">
+        const container = document.getElementById('content');
+        container.innerHTML = marked.parse(markdown);
+
+        // Replace mermaid pre blocks
+        const codeBlocks = container.querySelectorAll('pre code.language-mermaid');
+        codeBlocks.forEach(block => {
+          const pre = block.parentElement;
+          const mermaidDiv = document.createElement('div');
+          mermaidDiv.className = 'mermaid';
+          mermaidDiv.textContent = block.textContent;
+          pre.replaceWith(mermaidDiv);
+        });
+
+        // Re-run mermaid on generated blocks
+        await mermaid.run();
+
+        // Highlight code
+        hljs.highlightAll();
+      } catch (err) {
+        console.error(err);
+        document.getElementById('content').innerHTML = `
+          <div class="p-4 bg-red-50 text-red-700 rounded-lg">
+            <h2 class="font-bold">Error loading document</h2>
+            <p>Ensure you are viewing this file via a local web server or open in browser directly.</p>
+          </div>
+        `;
+      }
+    }
+
+    loadMarkdown();
+  </script>
+</body>
+</html>

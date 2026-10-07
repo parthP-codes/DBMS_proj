@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OmniCart 360 - Cloud-Native AWS Storefront</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @keyframes pulse-slow {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.85; transform: scale(1.02); }
+    }
+    .pulse-glow { animation: pulse-slow 3s infinite ease-in-out; }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-amber-500 selection:text-black">
+
+  <!-- Top Announcement Bar -->
+  <div class="bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 text-white text-xs font-semibold py-1.5 px-4 text-center flex items-center justify-center gap-2 shadow-inner">
+    <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+    <span>LIVE AWS ENVIRONMENT CONNECTED &bull; Region: us-east-1 (N. Virginia) &bull; Account: 404006608500</span>
+  </div>
+
+  <!-- Navbar -->
+  <header class="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      
+      <!-- Brand Logo -->
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-orange-500/20">
+          <i data-lucide="shopping-bag" class="w-5 h-5 text-slate-950"></i>
+        </div>
+        <div>
+          <span class="text-xl font-black tracking-tight text-white flex items-center gap-1.5">
+            OmniCart <span class="text-amber-500">360</span>
+          </span>
+          <span class="text-[10px] text-slate-400 font-mono tracking-widest uppercase block -mt-1">Cloud-Native AWS Platform</span>
+        </div>
+      </div>
+
+      <!-- Center Live Cloud Status Badges -->
+      <div class="hidden lg:flex items-center space-x-2">
+        <div class="bg-slate-800/80 border border-slate-700 rounded-lg px-2.5 py-1 flex items-center space-x-2 text-xs font-mono">
+          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          <span class="text-slate-300">DynamoDB: <strong class="text-emerald-400">Active</strong></span>
+        </div>
+        <div class="bg-slate-800/80 border border-slate-700 rounded-lg px-2.5 py-1 flex items-center space-x-2 text-xs font-mono">
+          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          <span class="text-slate-300">SQS Queue: <strong class="text-emerald-400">Ready</strong></span>
+        </div>
+        <div class="bg-slate-800/80 border border-slate-700 rounded-lg px-2.5 py-1 flex items-center space-x-2 text-xs font-mono">
+          <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+          <span class="text-slate-300">Cognito: <strong class="text-purple-400">us-east-1_HNnLI9NzL</strong></span>
+        </div>
+      </div>
+
+      <!-- Right Action Controls -->
+      <div class="flex items-center space-x-3">
+        <!-- Architecture Inspector -->
+        <button onclick="openArchitectureModal()" class="hidden sm:inline-flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-medium px-3 py-2 rounded-lg transition shadow-sm">
+          <i data-lucide="layers" class="w-4 h-4 text-amber-400"></i>
+          <span>Architecture Flow</span>
+        </button>
+
+        <!-- Cognito Auth Controls Container -->
+        <div id="auth-controls" class="flex items-center space-x-2">
+          <!-- State: Guest (Sign In / Sign Up) -->
+          <button id="auth-btn" onclick="openAuthModal()" class="inline-flex items-center space-x-1.5 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/50 text-purple-300 text-xs font-medium px-3 py-2 rounded-lg transition">
+            <i data-lucide="user" class="w-4 h-4"></i>
+            <span>Sign In / Sign Up</span>
+          </button>
+        </div>
+
+        <!-- Cart Button -->
+        <button onclick="toggleCartDrawer()" class="relative bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-lg transition flex items-center space-x-2 shadow-lg shadow-amber-500/10">
+          <i data-lucide="shopping-cart" class="w-4 h-4"></i>
+          <span>Cart</span>
+          <span id="cart-badge" class="bg-slate-950 text-amber-400 text-xs px-1.5 py-0.5 rounded-full font-mono ml-1">0</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Banner -->
+  <section class="relative overflow-hidden py-10 px-4 sm:px-6 lg:px-8 border-b border-slate-800 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8">
+      <div class="max-w-2xl">
+        <div class="inline-flex items-center space-x-2 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs px-3 py-1 rounded-full mb-3 font-mono">
+          <i data-lucide="shield-check" class="w-3.5 h-3.5 text-purple-400"></i>
+          <span>Zero-Trust Auth &bull; Microservices &bull; Serverless</span>
+        </div>
+        <h1 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-white">
+          Omnichannel Retail on <span class="bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">Amazon Web Services</span>
+        </h1>
+        <p class="mt-3 text-sm sm:text-base text-slate-400 leading-relaxed">
+          Integrated with active AWS primitives: Identity secured via 
+          <code class="text-purple-400 bg-slate-800 px-1.5 py-0.5 rounded text-xs font-mono">Amazon Cognito</code>, catalogs persisted in 
+          <code class="text-amber-400 bg-slate-800 px-1.5 py-0.5 rounded text-xs font-mono">Amazon DynamoDB</code>, and checkout transactions dispatched to 
+          <code class="text-emerald-400 bg-slate-800 px-1.5 py-0.5 rounded text-xs font-mono">Amazon SQS</code>.
+        </p>
+      </div>
+      
+      <!-- Quick Telemetry Card -->
+      <div class="w-full md:w-auto bg-slate-800/60 border border-slate-700/80 rounded-2xl p-5 shadow-xl backdrop-blur">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 font-mono mb-3 flex items-center justify-between">
+          <span>Active AWS Endpoints</span>
+          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+        </h2>
+        <div class="space-y-2 text-xs font-mono">
+          <div class="flex items-center justify-between gap-4">
+            <span class="text-slate-400">VPC ID:</span>
+            <span class="text-slate-200">vpc-018fb8028faa12bc7</span>
+          </div>
+          <div class="flex items-center justify-between gap-4">
+            <span class="text-slate-400">Cognito Pool:</span>
+            <span class="text-purple-300 font-bold">us-east-1_HNnLI9NzL</span>
+          </div>
+          <div class="flex items-center justify-between gap-4">
+            <span class="text-slate-400">App Client ID:</span>
+            <span class="text-slate-300">5lv31ch5jipcofi363s2l16cg9</span>
+          </div>
+          <div class="flex items-center justify-between gap-4">
+            <span class="text-slate-400">SQS Queue:</span>
+            <span class="text-emerald-400 font-bold">omnicart-prod-order-fulfillment</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Content: Product Catalog Grid -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 flex-1 w-full">
+    
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
+      <div>
+        <h2 class="text-2xl font-bold text-white flex items-center gap-2">
+          <span>Live Product Catalog</span>
+          <span class="text-xs font-normal bg-slate-800 text-slate-400 px-2.5 py-1 rounded-full border border-slate-700">Source: DynamoDB</span>
+        </h2>
+        <p class="text-xs text-slate-400 mt-1">Single-digit millisecond retrieval from table: <strong class="text-slate-300">omnicart-prod-products</strong></p>
+      </div>
+
+      <button onclick="loadProducts()" class="inline-flex items-center space-x-1.5 text-xs text-amber-400 hover:text-amber-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-2 rounded-lg transition font-mono">
+        <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+        <span>Refresh DynamoDB Data</span>
+      </button>
+    </div>
+
+    <!-- Product Grid -->
+    <div id="product-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <!-- Loading Skeleton -->
+      <div class="col-span-full py-16 text-center">
+        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500 mb-4"></div>
+        <p class="text-slate-400 text-sm">Querying Amazon DynamoDB in us-east-1...</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Slide-Over Shopping Cart Drawer -->
+  <div id="cart-drawer" class="fixed inset-y-0 right-0 max-w-full flex pl-10 z-50 transform translate-x-full transition-transform duration-300 ease-in-out">
+    <div class="w-screen max-w-md bg-slate-900 border-l border-slate-800 shadow-2xl flex flex-col">
+      
+      <!-- Drawer Header -->
+      <div class="p-6 border-b border-slate-800 flex items-center justify-between bg-slate-950">
+        <div class="flex items-center space-x-2">
+          <i data-lucide="shopping-cart" class="w-5 h-5 text-amber-400"></i>
+          <h2 class="text-lg font-bold text-white">Your Shopping Cart</h2>
+        </div>
+        <button onclick="toggleCartDrawer()" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Drawer Items Container -->
+      <div id="cart-items" class="flex-1 overflow-y-auto p-6 space-y-4">
+        <!-- Injected via JavaScript -->
+      </div>
+
+      <!-- Drawer Footer & Checkout Button -->
+      <div class="p-6 border-t border-slate-800 bg-slate-950/80 space-y-4">
+        <div class="flex justify-between items-center text-sm">
+          <span class="text-slate-400">Subtotal:</span>
+          <span id="cart-subtotal" class="text-xl font-bold text-white font-mono">$0.00</span>
+        </div>
+        <div id="cart-user-notice" class="text-[11px] text-slate-400 font-mono flex items-center gap-1.5">
+          <i data-lucide="info" class="w-3.5 h-3.5 text-amber-400"></i>
+          <span id="cart-user-text">Checking out as: <strong>Guest Shopper</strong></span>
+        </div>
+        <button id="checkout-btn" onclick="executeCheckout()" class="w-full bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-bold py-3 px-4 rounded-xl shadow-lg shadow-orange-500/20 transition flex items-center justify-center space-x-2">
+          <i data-lucide="send" class="w-4 h-4"></i>
+          <span>Place Order & Dispatch to SQS</span>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div id="cart-overlay" onclick="toggleCartDrawer()" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 hidden transition-opacity"></div>
+
+  <!-- Amazon Cognito Authentication Modal -->
+  <div id="auth-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden">
+    <div class="bg-slate-900 border border-purple-500/40 rounded-2xl max-w-md w-full p-6 sm:p-8 shadow-2xl relative">
+      <button onclick="closeAuthModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white p-1">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <!-- Modal Header -->
+      <div class="text-center mb-6">
+        <div class="w-12 h-12 bg-purple-500/10 border border-purple-500/30 text-purple-400 rounded-xl flex items-center justify-center mx-auto mb-3">
+          <i data-lucide="shield-check" class="w-6 h-6"></i>
+        </div>
+        <h3 class="text-xl font-bold text-white">Amazon Cognito Authentication</h3>
+        <p class="text-xs text-slate-400 mt-1">Pool ID: <code class="text-purple-300 font-mono">us-east-1_HNnLI9NzL</code></p>
+      </div>
+
+      <!-- Tabs: Sign In / Create Account -->
+      <div class="flex border-b border-slate-800 mb-6">
+        <button id="tab-login-btn" onclick="switchAuthTab('login')" class="flex-1 pb-3 text-xs font-bold border-b-2 border-purple-500 text-purple-400 transition">
+          Sign In
+        </button>
+        <button id="tab-register-btn" onclick="switchAuthTab('register')" class="flex-1 pb-3 text-xs font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition">
+          Create Account
+        </button>
+      </div>
+
+      <!-- Sign In Form -->
+      <form id="login-form" onsubmit="handleLogin(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Email Address</label>
+          <input type="email" id="login-email" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-purple-500 transition font-mono" placeholder="student@example.com" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Password</label>
+          <input type="password" id="login-password" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-purple-500 transition font-mono" placeholder="••••••••" />
+        </div>
+        <button type="submit" id="login-submit-btn" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition flex items-center justify-center gap-2">
+          <span>Authenticate with Cognito</span>
+          <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+        </button>
+        <button type="button" onclick="prefillDemoUser()" class="w-full text-center text-[11px] text-purple-400/80 hover:text-purple-300 transition py-1 font-mono">
+          [Click to pre-fill demo account: demo_student@omnicart.com]
+        </button>
+      </form>
+
+      <!-- Create Account Form -->
+      <form id="register-form" onsubmit="handleRegister(event)" class="space-y-4 hidden">
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Full Name</label>
+          <input type="text" id="reg-name" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-purple-500 transition" placeholder="John Doe" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Email Address</label>
+          <input type="email" id="reg-email" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-purple-500 transition font-mono" placeholder="newuser@example.com" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Password</label>
+          <input type="password" id="reg-password" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-purple-500 transition font-mono" placeholder="Password123!" />
+          <p class="text-[10px] text-slate-500 mt-1">Min 8 chars, 1 uppercase letter, 1 number (Cognito Policy).</p>
+        </div>
+        <button type="submit" id="register-submit-btn" class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition flex items-center justify-center gap-2">
+          <span>Register User in Amazon Cognito</span>
+          <i data-lucide="user-plus" class="w-3.5 h-3.5"></i>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- JWT Token Inspector Modal -->
+  <div id="jwt-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+        <div class="flex items-center space-x-2">
+          <i data-lucide="key" class="w-5 h-5 text-purple-400"></i>
+          <h3 class="text-base font-bold text-white">Cryptographic JWT Token Issued by Amazon Cognito</h3>
+        </div>
+        <button onclick="closeJwtModal()" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="py-4 space-y-4">
+        <div>
+          <span class="text-xs font-bold text-slate-300 block mb-1">Decoded Token Claims (OIDC):</span>
+          <pre id="jwt-claims" class="bg-slate-950 border border-slate-800 p-4 rounded-xl text-xs font-mono text-emerald-400 overflow-x-auto max-h-56"></pre>
+        </div>
+        <div>
+          <span class="text-xs font-bold text-slate-300 block mb-1">Raw Signed ID Token:</span>
+          <textarea id="jwt-raw" readonly class="w-full bg-slate-950 border border-slate-800 p-3 rounded-xl text-[10px] font-mono text-slate-400 h-20 focus:outline-none resize-none"></textarea>
+        </div>
+      </div>
+      <div class="text-right border-t border-slate-800 pt-4">
+        <button onclick="closeJwtModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg text-xs font-semibold">
+          Close Inspector
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Order Confirmation Modal -->
+  <div id="order-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm hidden">
+    <div class="bg-slate-900 border border-emerald-500/40 rounded-2xl max-w-lg w-full p-6 sm:p-8 shadow-2xl relative">
+      <div class="w-14 h-14 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-2xl flex items-center justify-center mx-auto mb-4">
+        <i data-lucide="check-circle" class="w-8 h-8"></i>
+      </div>
+      <h3 class="text-xl font-extrabold text-white text-center">Order Dispatched to AWS SQS!</h3>
+      <p class="text-xs text-slate-400 text-center mt-1">Transaction processed via the Cloud-Native event backbone.</p>
+
+      <!-- Details Card -->
+      <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 my-6 space-y-2.5 text-xs font-mono">
+        <div class="flex justify-between">
+          <span class="text-slate-400">Order ID:</span>
+          <span id="modal-order-id" class="text-amber-400 font-bold">ORD-12345</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-400">Customer Identity:</span>
+          <span id="modal-customer" class="text-purple-300 font-semibold">guest@omnicart.com</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-400">Total Amount:</span>
+          <span id="modal-order-total" class="text-white font-bold">$0.00</span>
+        </div>
+        <div class="flex flex-col gap-1 pt-2 border-t border-slate-800">
+          <span class="text-slate-400">AWS SQS Message ID:</span>
+          <span id="modal-sqs-id" class="text-emerald-400 text-[11px] break-all font-semibold">--</span>
+        </div>
+        <div class="flex justify-between pt-1">
+          <span class="text-slate-400">Target Queue:</span>
+          <span class="text-slate-300">omnicart-prod-order-fulfillment</span>
+        </div>
+      </div>
+
+      <div class="flex flex-col gap-2.5">
+        <a href="https://us-east-1.console.aws.amazon.com/sqs/v2/home?region=us-east-1#/queues" target="_blank" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 text-center py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 border border-slate-700 transition">
+          <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+          <span>View Message in AWS SQS Console</span>
+        </a>
+        <button onclick="closeOrderModal()" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 py-2.5 px-4 rounded-xl text-xs font-bold transition">
+          Close & Continue Shopping
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Architecture Inspector Modal -->
+  <div id="arch-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+        <div class="flex items-center space-x-2">
+          <i data-lucide="layers" class="w-5 h-5 text-amber-400"></i>
+          <h3 class="text-lg font-bold text-white">Live Cloud Architecture Packet Flow</h3>
+        </div>
+        <button onclick="closeArchitectureModal()" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="py-6 space-y-4">
+        <div class="flex items-start space-x-3 bg-slate-950 p-3.5 rounded-xl border border-slate-800">
+          <span class="px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 font-mono text-xs font-bold">1</span>
+          <div>
+            <h4 class="text-xs font-bold text-slate-200">Amazon Cognito (Zero-Trust Identity)</h4>
+            <p class="text-xs text-slate-400 mt-0.5">Issues signed OAuth 2.0 / OIDC JWT tokens verifying customer credentials.</p>
+          </div>
+        </div>
+
+        <div class="flex items-start space-x-3 bg-slate-950 p-3.5 rounded-xl border border-slate-800">
+          <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-mono text-xs font-bold">2</span>
+          <div>
+            <h4 class="text-xs font-bold text-slate-200">Public Application Load Balancer</h4>
+            <p class="text-xs text-slate-400 mt-0.5">Terminates TLS in Public Subnet and routes to ECS Fargate tasks across Multi-AZ.</p>
+          </div>
+        </div>
+
+        <div class="flex items-start space-x-3 bg-slate-950 p-3.5 rounded-xl border border-slate-800">
+          <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-mono text-xs font-bold">3</span>
+          <div>
+            <h4 class="text-xs font-bold text-slate-200">Amazon DynamoDB Persistence</h4>
+            <p class="text-xs text-slate-400 mt-0.5">Scans active product inventory and manages session cart entities.</p>
+          </div>
+        </div>
+
+        <div class="flex items-start space-x-3 bg-slate-950 p-3.5 rounded-xl border border-slate-800">
+          <span class="px-2 py-0.5 rounded bg-orange-500/20 text-orange-400 font-mono text-xs font-bold">4</span>
+          <div>
+            <h4 class="text-xs font-bold text-slate-200">Amazon SQS Event-Driven Queue</h4>
+            <p class="text-xs text-slate-400 mt-0.5">Buffers order messages for async warehouse fulfillment workers and notification dispatchers.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="text-right border-t border-slate-800 pt-4">
+        <button onclick="closeArchitectureModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg text-xs font-semibold">
+          Close Inspector
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Live Telemetry Bar at Bottom -->
+  <footer class="bg-slate-950 border-t border-slate-800 py-3 px-6 text-xs text-slate-400 font-mono flex flex-col sm:flex-row items-center justify-between gap-2">
+    <div class="flex items-center space-x-2">
+      <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+      <span>API Status: <strong>Online</strong> &bull; Region: <strong>us-east-1</strong></span>
+    </div>
+    <div id="live-log" class="text-amber-400/90 truncate max-w-lg">
+      Ready. Awaiting user interaction...
+    </div>
+  </footer>
+
+  <!-- Storefront JavaScript Logic -->
+  <script>
+    let products = [];
+    let cart = [];
+    let currentUser = null;
+    let currentTokens = null;
+
+    const productImages = {
+      "prod-101": "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&auto=format&fit=crop&q=80",
+      "prod-102": "https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=600&auto=format&fit=crop&q=80",
+      "prod-103": "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=600&auto=format&fit=crop&q=80"
+    };
+
+    function logTelemetry(msg) {
+      document.getElementById('live-log').innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    }
+
+    // --- Authentication Functions ---
+    function openAuthModal() {
+      document.getElementById('auth-modal').classList.remove('hidden');
+    }
+
+    function closeAuthModal() {
+      document.getElementById('auth-modal').classList.add('hidden');
+    }
+
+    function switchAuthTab(tab) {
+      const loginForm = document.getElementById('login-form');
+      const regForm = document.getElementById('register-form');
+      const loginTab = document.getElementById('tab-login-btn');
+      const regTab = document.getElementById('tab-register-btn');
+
+      if (tab === 'login') {
+        loginForm.classList.remove('hidden');
+        regForm.classList.add('hidden');
+        loginTab.className = "flex-1 pb-3 text-xs font-bold border-b-2 border-purple-500 text-purple-400 transition";
+        regTab.className = "flex-1 pb-3 text-xs font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition";
+      } else {
+        loginForm.classList.add('hidden');
+        regForm.classList.remove('hidden');
+        regTab.className = "flex-1 pb-3 text-xs font-bold border-b-2 border-purple-500 text-purple-400 transition";
+        loginTab.className = "flex-1 pb-3 text-xs font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition";
+      }
+    }
+
+    function prefillDemoUser() {
+      document.getElementById('login-email').value = "demo_student@omnicart.com";
+      document.getElementById('login-password').value = "Password123!";
+    }
+
+    async function handleRegister(e) {
+      e.preventDefault();
+      const name = document.getElementById('reg-name').value;
+      const email = document.getElementById('reg-email').value;
+      const password = document.getElementById('reg-password').value;
+      const btn = document.getElementById('register-submit-btn');
+
+      btn.disabled = true;
+      btn.innerHTML = `<div class="inline-block animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white mr-2"></div> Creating Cognito User...`;
+      logTelemetry(`Creating user [${email}] in Amazon Cognito User Pool us-east-1_HNnLI9NzL...`);
+
+      try {
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, password })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Registration failed');
+
+        alert(`✅ Account created successfully in Amazon Cognito!\nYou can now sign in with your credentials.`);
+        logTelemetry(`User [${email}] confirmed in Amazon Cognito!`);
+        
+        // Switch to login tab and prefill
+        switchAuthTab('login');
+        document.getElementById('login-email').value = email;
+        document.getElementById('login-password').value = password;
+      } catch (err) {
+        alert("Registration Error: " + err.message);
+        logTelemetry(`Cognito Error: ${err.message}`);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<span>Register User in Amazon Cognito</span> <i data-lucide="user-plus" class="w-3.5 h-3.5"></i>`;
+        lucide.createIcons();
+      }
+    }
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById('login-email').value;
+      const password = document.getElementById('login-password').value;
+      const btn = document.getElementById('login-submit-btn');
+
+      btn.disabled = true;
+      btn.innerHTML = `<div class="inline-block animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white mr-2"></div> Authenticating...`;
+      logTelemetry(`Verifying credentials with Amazon Cognito (SRP protocol)...`);
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Authentication failed');
+
+        currentUser = email;
+        currentTokens = data;
+
+        updateAuthUI();
+        closeAuthModal();
+        logTelemetry(`Authenticated as [${email}]. Signed JWT tokens received from Cognito.`);
+      } catch (err) {
+        alert("Authentication Error: " + err.message);
+        logTelemetry(`Cognito Auth Error: ${err.message}`);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<span>Authenticate with Cognito</span> <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>`;
+        lucide.createIcons();
+      }
+    }
+
+    function updateAuthUI() {
+      const container = document.getElementById('auth-controls');
+      const cartNotice = document.getElementById('cart-user-text');
+
+      if (currentUser) {
+        container.innerHTML = `
+          <div class="flex items-center space-x-2">
+            <button onclick="openJwtModal()" class="bg-purple-950/80 border border-purple-500/40 text-purple-300 px-2.5 py-1.5 rounded-lg text-xs font-mono flex items-center space-x-1.5 hover:bg-purple-900/60 transition">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span class="truncate max-w-[140px]">${currentUser}</span>
+              <span class="text-[10px] bg-purple-800 text-purple-200 px-1 py-0.2 rounded font-sans">JWT</span>
+            </button>
+            <button onclick="handleLogout()" class="text-slate-400 hover:text-red-400 p-1.5 rounded-lg transition" title="Sign Out">
+              <i data-lucide="log-out" class="w-4 h-4"></i>
+            </button>
+          </div>
+        `;
+        cartNotice.innerHTML = `Checking out as: <strong class="text-purple-300 font-mono">${currentUser}</strong> (Cognito Verified)`;
+      } else {
+        container.innerHTML = `
+          <button id="auth-btn" onclick="openAuthModal()" class="inline-flex items-center space-x-1.5 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/50 text-purple-300 text-xs font-medium px-3 py-2 rounded-lg transition">
+            <i data-lucide="user" class="w-4 h-4"></i>
+            <span>Sign In / Sign Up</span>
+          </button>
+        `;
+        cartNotice.innerHTML = `Checking out as: <strong>Guest Shopper</strong>`;
+      }
+      lucide.createIcons();
+    }
+
+    function handleLogout() {
+      currentUser = null;
+      currentTokens = null;
+      updateAuthUI();
+      logTelemetry('Signed out. Reverted to Guest session.');
+    }
+
+    function parseJwt(token) {
+      try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        return JSON.parse(jsonPayload);
+      } catch (e) {
+        return { error: "Unable to parse JWT token" };
+      }
+    }
+
+    function openJwtModal() {
+      if (!currentTokens) return;
+      const claims = parseJwt(currentTokens.id_token);
+      document.getElementById('jwt-claims').innerText = JSON.stringify(claims, null, 2);
+      document.getElementById('jwt-raw').value = currentTokens.id_token;
+      document.getElementById('jwt-modal').classList.remove('hidden');
+    }
+
+    function closeJwtModal() {
+      document.getElementById('jwt-modal').classList.add('hidden');
+    }
+
+    // --- Product Catalog Functions ---
+    async function loadProducts() {
+      const grid = document.getElementById('product-grid');
+      grid.innerHTML = `
+        <div class="col-span-full py-16 text-center">
+          <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500 mb-4"></div>
+          <p class="text-slate-400 text-sm">Querying Amazon DynamoDB in us-east-1...</p>
+        </div>
+      `;
+      logTelemetry('Fetching products from Amazon DynamoDB table omnicart-prod-products...');
+
+      try {
+        const response = await fetch('/api/products');
+        if (!response.ok) throw new Error('API request failed');
+        products = await response.json();
+
+        if (products.length === 0) {
+          grid.innerHTML = `
+            <div class="col-span-full py-12 text-center text-slate-400">
+              No products found in DynamoDB table. Run test_platform.py to seed items!
+            </div>
+          `;
+          return;
+        }
+
+        grid.innerHTML = products.map(prod => `
+          <div class="bg-slate-800/40 border border-slate-700/60 rounded-2xl overflow-hidden hover:border-amber-500/50 transition-all duration-300 flex flex-col group shadow-lg">
+            <div class="h-48 overflow-hidden relative bg-slate-950">
+              <img src="${productImages[prod.ProductId] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600'}" alt="${prod.Name}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+              <span class="absolute top-3 left-3 bg-slate-900/90 backdrop-blur border border-slate-700 text-amber-400 text-[10px] font-mono font-bold px-2.5 py-1 rounded-md uppercase">
+                ${prod.Category}
+              </span>
+              <span class="absolute top-3 right-3 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-mono font-bold px-2 py-0.5 rounded">
+                ${prod.Stock} IN STOCK
+              </span>
+            </div>
+            
+            <div class="p-5 flex-1 flex flex-col justify-between">
+              <div>
+                <span class="text-[11px] font-mono text-slate-400 block">${prod.ProductId}</span>
+                <h3 class="text-base font-bold text-white group-hover:text-amber-400 transition-colors mt-0.5">${prod.Name}</h3>
+              </div>
+              
+              <div class="mt-5 pt-4 border-t border-slate-700/50 flex items-center justify-between">
+                <div>
+                  <span class="text-xs text-slate-400 block">Unit Price</span>
+                  <span class="text-xl font-bold font-mono text-white">$${parseFloat(prod.Price).toFixed(2)}</span>
+                </div>
+                <button onclick="addToCart('${prod.ProductId}')" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-3.5 py-2 rounded-xl text-xs flex items-center space-x-1.5 transition">
+                  <i data-lucide="plus" class="w-4 h-4"></i>
+                  <span>Add to Cart</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        `).join('');
+
+        lucide.createIcons();
+        logTelemetry(`Loaded ${products.length} products successfully from DynamoDB.`);
+      } catch (err) {
+        console.error(err);
+        grid.innerHTML = `
+          <div class="col-span-full py-12 text-center text-red-400">
+            Failed to connect to backend: ${err.message}. Make sure server.py is running.
+          </div>
+        `;
+        logTelemetry(`Error loading products: ${err.message}`);
+      }
+    }
+
+    function addToCart(productId) {
+      const prod = products.find(p => p.ProductId === productId);
+      if (!prod) return;
+
+      const existing = cart.find(c => c.ProductId === productId);
+      if (existing) {
+        existing.quantity += 1;
+      } else {
+        cart.push({ ...prod, quantity: 1 });
+      }
+
+      updateCartUI();
+      logTelemetry(`Added [${prod.Name}] to cart. Current items: ${cart.reduce((a, b) => a + b.quantity, 0)}`);
+    }
+
+    function removeFromCart(productId) {
+      cart = cart.filter(c => c.ProductId !== productId);
+      updateCartUI();
+    }
+
+    function updateCartUI() {
+      const count = cart.reduce((acc, item) => acc + item.quantity, 0);
+      document.getElementById('cart-badge').innerText = count;
+
+      const subtotal = cart.reduce((acc, item) => acc + (parseFloat(item.Price) * item.quantity), 0);
+      document.getElementById('cart-subtotal').innerText = `$${subtotal.toFixed(2)}`;
+
+      const container = document.getElementById('cart-items');
+      if (cart.length === 0) {
+        container.innerHTML = `
+          <div class="py-12 text-center text-slate-500 text-sm">
+            Your cart is empty. Add items from the catalog!
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = cart.map(item => `
+        <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
+          <div>
+            <h4 class="text-xs font-bold text-white">${item.Name}</h4>
+            <div class="text-[11px] text-slate-400 font-mono mt-0.5">
+              Qty: ${item.quantity} &times; $${parseFloat(item.Price).toFixed(2)}
+            </div>
+          </div>
+          <div class="flex items-center space-x-3">
+            <span class="text-xs font-bold font-mono text-amber-400">
+              $${(item.quantity * parseFloat(item.Price)).toFixed(2)}
+            </span>
+            <button onclick="removeFromCart('${item.ProductId}')" class="text-slate-500 hover:text-red-400 p-1">
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+      `).join('');
+
+      lucide.createIcons();
+    }
+
+    async function executeCheckout() {
+      if (cart.length === 0) {
+        alert("Your cart is empty!");
+        return;
+      }
+
+      const checkoutBtn = document.getElementById('checkout-btn');
+      checkoutBtn.disabled = true;
+      checkoutBtn.innerHTML = `
+        <div class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-slate-950 mr-2"></div>
+        <span>Dispatching to Amazon SQS...</span>
+      `;
+
+      logTelemetry('Sending order payload to /api/orders (Queue: omnicart-prod-order-fulfillment)...');
+
+      try {
+        const payload = {
+          items: cart.map(item => ({
+            product_id: item.ProductId,
+            name: item.Name,
+            quantity: item.quantity,
+            price: parseFloat(item.Price)
+          })),
+          customer_email: currentUser || "guest@omnicart.com",
+          shipping_address: "Campus Department of Computer Science"
+        };
+
+        const res = await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) throw new Error('Order creation failed');
+        const data = await res.json();
+
+        // Populate and open confirmation modal
+        document.getElementById('modal-order-id').innerText = data.order_id;
+        document.getElementById('modal-customer').innerText = data.customer_email;
+        document.getElementById('modal-order-total').innerText = `$${parseFloat(data.total_amount).toFixed(2)}`;
+        document.getElementById('modal-sqs-id').innerText = data.sqs_message_id;
+
+        toggleCartDrawer();
+        document.getElementById('order-modal').classList.remove('hidden');
+
+        // Clear Cart
+        cart = [];
+        updateCartUI();
+        logTelemetry(`Order placed successfully! SQS Message ID: ${data.sqs_message_id}`);
+      } catch (err) {
+        alert("Checkout error: " + err.message);
+        logTelemetry(`Checkout failed: ${err.message}`);
+      } finally {
+        checkoutBtn.disabled = false;
+        checkoutBtn.innerHTML = `
+          <i data-lucide="send" class="w-4 h-4"></i>
+          <span>Place Order & Dispatch to SQS</span>
+        `;
+        lucide.createIcons();
+      }
+    }
+
+    function toggleCartDrawer() {
+      const drawer = document.getElementById('cart-drawer');
+      const overlay = document.getElementById('cart-overlay');
+      const isOpen = !drawer.classList.contains('translate-x-full');
+
+      if (isOpen) {
+        drawer.classList.add('translate-x-full');
+        overlay.classList.add('hidden');
+      } else {
+        drawer.classList.remove('translate-x-full');
+        overlay.classList.remove('hidden');
+      }
+    }
+
+    function openArchitectureModal() {
+      document.getElementById('arch-modal').classList.remove('hidden');
+    }
+
+    function closeArchitectureModal() {
+      document.getElementById('arch-modal').classList.add('hidden');
+    }
+
+    function closeOrderModal() {
+      document.getElementById('order-modal').classList.add('hidden');
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      loadProducts();
+    });
+  </script>
+</body>
+</html>

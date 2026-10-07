@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  # 1. Product Catalog Service
+  catalog-service:
+    build:
+      context: ./services/catalog-service
+    ports:
+      - "8081:8080"
+    environment:
+      - PORT=8080
+      - REDIS_HOST=redis
+      - DYNAMODB_ENDPOINT=http://localstack:4566
+    depends_on:
+      - redis
+
+  # 2. Order Orchestration Service
+  order-service:
+    build:
+      context: ./services/order-service
+    ports:
+      - "8082:8080"
+    environment:
+      - PORT=8080
+      - DB_HOST=postgres
+      - DB_USER=omnicart
+      - DB_PASSWORD=secretpassword
+      - DB_NAME=omnicart_orders
+    depends_on:
+      - postgres
+
+  # 3. Local In-Memory Cache (Simulating Amazon ElastiCache Redis)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  # 4. Local Relational DB (Simulating Amazon Aurora PostgreSQL)
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: omnicart
+      POSTGRES_PASSWORD: secretpassword
+      POSTGRES_DB: omnicart_orders
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
