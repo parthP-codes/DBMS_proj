@@ -12,7 +12,8 @@ from decimal import Decimal
 import boto3
 
 REGION = "us-east-1"
-PORT = 8000
+PORT = int(os.environ.get("PORT", 8000))
+HOST = os.environ.get("HOST", "127.0.0.1")  # this machine only; set HOST=0.0.0.0 to accept connections from elsewhere
 USER_POOL_ID = "us-east-1_HNnLI9NzL"
 CLIENT_ID = "5lv31ch5jipcofi363s2l16cg9"
 
@@ -234,7 +235,8 @@ class OmniCartRequestHandler(SimpleHTTPRequestHandler):
                 self.send_json(500, {"error": str(e)})
             return
 
-        return super().do_GET()
+        # Anything else is a 404. (The default handler would serve any file in the project folder, source code included.)
+        self.send_json(404, {"error": "Not found"})
 
     def do_PUT(self):
         # API: Replace the signed-in user's saved cart in DynamoDB (an empty list clears it)
@@ -473,7 +475,7 @@ if __name__ == "__main__":
     print("=" * 65)
     print("Press Ctrl+C to stop the server.\n")
 
-    server = HTTPServer(('0.0.0.0', PORT), OmniCartRequestHandler)
+    server = HTTPServer((HOST, PORT), OmniCartRequestHandler)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

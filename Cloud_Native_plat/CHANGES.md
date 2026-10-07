@@ -124,6 +124,15 @@ server-side search (the design document proposes OpenSearch).
 - Seeding uses `BatchWriteItem`, so the identity running it needs that permission (the original code needed only
   `PutItem`). It is in the list in step 3.
 
+### Round 3: getting ready to host
+
+**7. Safe to expose** (`server.py`, `EC2_DEPLOYMENT.md`, `requirements.txt`)
+
+- Only the storefront and `/api/...` are served; any other path (source files, scripts, infrastructure files) is a
+  404. `HOST` (default `127.0.0.1`) and `PORT` can be set with environment variables.
+- `EC2_DEPLOYMENT.md` is a step-by-step guide: IAM role instead of stored keys, security group, systemd service,
+  nginx on port 80 and optional HTTPS through CloudFront. It has not been tried on a real instance.
+
 ## Where to see it in AWS
 
 Console, region **N. Virginia (us-east-1)**.
@@ -165,7 +174,7 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-68 tests, about 50 seconds, no AWS account or network (AWS is emulated with `moto`).
+82 tests, about 60 seconds, no AWS account or network (AWS is emulated with `moto`).
 - `tests/test_register.py`: sign-up (every rule, no user left behind, retry works, rollback, rollback failing,
   duplicate email, non-text password).
 - `tests/test_products.py`: the catalogue (count, variety, unique ids and names, price/stock/status rules, seeding
@@ -179,7 +188,7 @@ pytest
 
 ## What was verified
 
-- The 68 tests, plus mutation checks: deliberately breaking the rollback, the user key, cart clearing, TTL handling,
+- The 82 tests, plus mutation checks: deliberately breaking the rollback, the user key, cart clearing, TTL handling,
   catalogue pricing, the quantity limit, the verified flag, the order's identity and bad-token handling each made a
   test fail.
 - Two headless-Chromium runs against the real `server.py` and real data on emulated AWS (Cognito, DynamoDB, SQS):
@@ -200,9 +209,10 @@ You asked to be told, so none of these were fixed. **[verified]** = reproduced o
 round 2 (change 5) and are no longer listed except for what remains.
 
 **Fix soon**
-1. **The server hands out your project folder** [verified]. `GET /server.py`, `/test_platform.py`, `/deploy.ps1` and
-   `/infrastructure/...` return the files. It also listens on `0.0.0.0`, so anyone on the same network can call the
-   endpoints that use your AWS credentials (create users, queue orders). Serve only `frontend/` and bind `127.0.0.1`.
+1. **FIXED for hosting (round 3):** the server used to hand out your whole project folder (`GET /server.py`,
+   `/deploy.ps1`, `/infrastructure/...`) and listened on every network interface. It now serves only the storefront and
+   the API (everything else is a 404, tested) and listens on `127.0.0.1` unless you set `HOST` (see
+   `EC2_DEPLOYMENT.md`). Still true once it is public: sign-up is open to anyone (issue 5).
 2. **`destroy.ps1` would not delete your stack** [read]. It targets `omnicar-prod` (missing "t") in `us-east-1`;
    `deploy.ps1` creates `omnicart-prod` in `ap-south-1`. AWS treats deleting a missing stack as a no-op, so it would
    very likely print "all billable resources removed" while the NAT Gateway and ALB keep costing money.
